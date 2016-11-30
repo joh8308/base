@@ -1,7 +1,28 @@
-import { composeWithTracker } from 'react-komposer';
 import { Meteor } from 'meteor/meteor';
 import AppNavigation from '../components/AppNavigation.js';
 
-const composer = (props, onData) => onData(null, { hasUser: Meteor.user() });
+import myReactCompose from '../../modules/composer.js';
 
-export default composeWithTracker(composer, {}, {}, { pure: false })(AppNavigation);
+function getTrackerLoader(reactiveMapper) {
+  return (props, onData, env) => {
+    let trackerCleanup = null;
+    const handler = Tracker.nonreactive(() => {
+      return Tracker.autorun(() => {
+        // assign the custom clean-up function.
+        trackerCleanup = reactiveMapper(props, onData, env);
+      });
+    });
+
+    return () => {
+      if(typeof trackerCleanup === 'function') trackerCleanup();
+      return handler.stop();
+    };
+  };
+}
+
+// usage
+function reactiveMapper(params, onData) {
+  onData(null, { hasUser: Meteor.user() })
+}
+
+export default myReactCompose(getTrackerLoader(reactiveMapper))(AppNavigation);

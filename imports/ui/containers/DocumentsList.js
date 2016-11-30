@@ -1,15 +1,33 @@
-import { composeWithTracker } from 'react-komposer';
 import { Meteor } from 'meteor/meteor';
 import Documents from '../../api/documents/documents.js';
 import DocumentsList from '../components/DocumentsList.js';
-import Loading from '../components/Loading.js';
 
-const composer = (params, onData) => {
-  const subscription = Meteor.subscribe('documents.list');
-  if (subscription.ready()) {
+import myReactCompose from '../../modules/composer.js';
+
+function getTrackerLoader(reactiveMapper) {
+  return (props, onData, env) => {
+    let trackerCleanup = null;
+    const handler = Tracker.nonreactive(() => {
+      return Tracker.autorun(() => {
+        // assign the custom clean-up function.
+        trackerCleanup = reactiveMapper(props, onData, env);
+      });
+    });
+
+    return () => {
+      if(typeof trackerCleanup === 'function') trackerCleanup();
+      return handler.stop();
+    };
+  };
+}
+
+// usage
+function reactiveMapper(params, onData) {
+  if (Meteor.subscribe('documents.list').ready()) {
     const documents = Documents.find().fetch();
     onData(null, { documents });
-  }
-};
+  };
+}
 
-export default composeWithTracker(composer, Loading)(DocumentsList);
+export default myReactCompose(getTrackerLoader(reactiveMapper))(DocumentsList);
+
